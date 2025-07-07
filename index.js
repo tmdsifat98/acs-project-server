@@ -36,10 +36,8 @@ async function run() {
     const routineCollection = db.collection("routines");
     const classCollection = db.collection("classes");
 
-
-
     //verify token
-     const verifyFirebaseToken = async (req, res, next) => {
+    const verifyFirebaseToken = async (req, res, next) => {
       const authHeader = req.headers.authorization;
       if (!authHeader || !authHeader.startsWith("Bearer ")) {
         return res.status(401).send({ message: "Unauthorized access" });
@@ -55,7 +53,26 @@ async function run() {
         res.status(401).send({ message: "Unauthorized access" });
       }
     };
-    
+
+    //verify admin
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const user = await userCollection.findOne({ email: email });
+      if (user?.role !== "admin") {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+      next();
+    };
+    //verify teacher
+    const verifyTeacher = async (req, res, next) => {
+      const email = req.decoded.email;
+      const user = await userCollection.findOne({ email: email });
+      if (user?.role !== "teacher") {
+        return res.status(403).send({ message: "Forbidden access" });
+      }
+      next();
+    };
+
     // set user on database with role
     app.post("/users", async (req, res) => {
       const { email, name } = req.body;
@@ -80,33 +97,48 @@ async function run() {
     });
 
     //make admin finder
-    app.get("/users/search", async (req, res) => {
-      const email = req.query.email;
-      const query = {};
-      query.email = { $regex: email, $options: "i" };
-      const result = await userCollection.find(query).toArray();
-      res.send(result);
-    });
+    app.get(
+      "/users/search",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.query.email;
+        const query = {};
+        query.email = { $regex: email, $options: "i" };
+        const result = await userCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
 
     //make admin
-    app.patch("/users/admin/:id", async (req, res) => {
-      const id = req.params.id;
-      const result = await userCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { role: "admin" } }
-      );
-      res.send(result);
-    });
+    app.patch(
+      "/users/admin/:id",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { role: "admin" } }
+        );
+        res.send(result);
+      }
+    );
 
     //Remove admin
-    app.patch("/users/admin/:id/remove", async (req, res) => {
-      const id = req.params.id;
-      const result = await userCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { role: "user" } }
-      );
-      res.send(result);
-    });
+    app.patch(
+      "/users/admin/:id/remove",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const result = await userCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { role: "user" } }
+        );
+        res.send(result);
+      }
+    );
 
     //get user by email
     app.get("/users/role/:email", async (req, res) => {
@@ -126,7 +158,7 @@ async function run() {
     });
 
     //get pending teachers
-    app.get("/teachers", async (req, res) => {
+    app.get("/teachers", verifyFirebaseToken, verifyAdmin, async (req, res) => {
       const status = req.query.status;
       const pendingTeachers = await teacherCollection
         .find({ status: status })
@@ -134,33 +166,48 @@ async function run() {
       res.send(pendingTeachers);
     });
 
-    app.patch("/teachers/:id", async (req, res) => {
-      const { id } = req.params;
-      const { status } = req.body;
-      const result = await teacherCollection.updateOne(
-        { _id: new ObjectId(id) },
-        { $set: { status } }
-      );
-      res.send(result);
-    });
+    app.patch(
+      "/teachers/:id",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { id } = req.params;
+        const { status } = req.body;
+        const result = await teacherCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { status } }
+        );
+        res.send(result);
+      }
+    );
     // PATCH /users/role/:email
-    app.patch("/users/role/:email", async (req, res) => {
-      const { email } = req.params;
-      const { role } = req.body;
-      const result = await userCollection.updateOne(
-        { email },
-        { $set: { role } }
-      );
-      res.send(result);
-    });
+    app.patch(
+      "/users/role/:email",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { email } = req.params;
+        const { role } = req.body;
+        const result = await userCollection.updateOne(
+          { email },
+          { $set: { role } }
+        );
+        res.send(result);
+      }
+    );
     // DELETE /teachers/:id
-    app.delete("/teachers/:id", async (req, res) => {
-      const { id } = req.params;
-      const result = await teacherCollection.deleteOne({
-        _id: new ObjectId(id),
-      });
-      res.send(result);
-    });
+    app.delete(
+      "/teachers/:id",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const { id } = req.params;
+        const result = await teacherCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      }
+    );
 
     app.get("/users", async (req, res) => {
       const role = req.query.role;
@@ -169,22 +216,34 @@ async function run() {
     });
 
     // DELETE /users/:id
-    app.delete("/users/:id", async (req, res) => {
-      const id = req.params.id;
-      const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
-      res.send(result);
-    });
-    app.delete("/users/firebase/:email", async (req, res) => {
-      const email = req.params.email;
-      try {
-        const userRecord = await admin.auth().getUserByEmail(email);
-        await admin.auth().deleteUser(userRecord.uid);
-        res.send({ success: true });
-      } catch (error) {
-        console.error(error);
-        res.status(500).send({ error: "Failed to delete from Firebase" });
+    app.delete(
+      "/users/:id",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const result = await userCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
       }
-    });
+    );
+    app.delete(
+      "/users/firebase/:email",
+      verifyFirebaseToken,
+      verifyAdmin,
+      async (req, res) => {
+        const email = req.params.email;
+        try {
+          const userRecord = await admin.auth().getUserByEmail(email);
+          await admin.auth().deleteUser(userRecord.uid);
+          res.send({ success: true });
+        } catch (error) {
+          console.error(error);
+          res.status(500).send({ error: "Failed to delete from Firebase" });
+        }
+      }
+    );
 
     //make routine
     app.post("/routines", async (req, res) => {
@@ -222,61 +281,82 @@ async function run() {
 
     //get all classes
     app.get("/classes", async (req, res) => {
-      const classes = await classCollection.find().toArray();
-      res.send(classes);
+      const sub = req.query.sub.toLowerCase();
+      let result;
+      if (sub === "all") {
+        result = await classCollection.find().toArray();
+      } else {
+        result = await classCollection.find({ subjectName: sub }).toArray();
+      }
+      res.send(result);
     });
     //get teachers classes
-    app.get("/my-classes", async (req, res) => {
-      const email = req.query.email;
-      try {
-        const classes = await classCollection
-          .find({ teacherEmail: email })
-          .sort({ createdAt: -1 })
-          .toArray();
-        res.json(classes);
-      } catch (err) {
-        res.status(500).json({ message: "Server Error" });
+    app.get(
+      "/my-classes",
+      verifyFirebaseToken,
+      verifyTeacher,
+      async (req, res) => {
+        const email = req.query.email;
+        try {
+          const classes = await classCollection
+            .find({ teacherEmail: email })
+            .sort({ createdAt: -1 })
+            .toArray();
+          res.json(classes);
+        } catch (err) {
+          res.status(500).json({ message: "Server Error" });
+        }
       }
-    });
+    );
     //edit class content
-    app.patch("/classes/:id", async (req, res) => {
-      const { id } = req.params;
-      const { className, youtubeLink, email } = req.body;
-      console.log(className, email,id);
+    app.patch(
+      "/classes/:id",
+      verifyFirebaseToken,
+      verifyTeacher,
+      async (req, res) => {
+        const { id } = req.params;
+        const { className, youtubeLink, email } = req.body;
+        console.log(className, email, id);
 
-      try {
-        const result = await classCollection.updateOne(
-          {
-            _id: new ObjectId(id),
-            teacherEmail: email,
-          },
-          {
-            $set: {
-              className,
-              youtubeLink,
+        try {
+          const result = await classCollection.updateOne(
+            {
+              _id: new ObjectId(id),
+              teacherEmail: email,
             },
-          }
-        );
+            {
+              $set: {
+                className,
+                youtubeLink,
+              },
+            }
+          );
 
-       res.send(result)
-      } catch (err) {
-        res.status(500).json({ message: "Server Error" });
+          res.send(result);
+        } catch (err) {
+          res.status(500).json({ message: "Server Error" });
+        }
       }
-    });
+    );
     //delete classes
-    app.delete("/classes/:id", async (req, res) => {
-      const id = req.params.id
+    app.delete(
+      "/classes/:id",
+      verifyFirebaseToken,
+      verifyTeacher,
+      async (req, res) => {
+        const id = req.params.id;
 
-      try {
-        const result = await classCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
+        try {
+          const result = await classCollection.deleteOne({
+            _id: new ObjectId(id),
+          });
 
-        res.send(result);
-      } catch (err) {
-        res.status(500).json({ message: "Server Error" });
+          res.send(result);
+        } catch (err) {
+          res.status(500).json({ message: "Server Error" });
+        }
       }
-    });
+    );
   } finally {
   }
 }
