@@ -33,6 +33,7 @@ async function run() {
     const db = client.db("acs");
     const userCollection = db.collection("users");
     const teacherCollection = db.collection("teachers");
+    const routineCollection = db.collection("routines");
 
     // set user on database with role
     app.post("/users", async (req, res) => {
@@ -54,6 +55,35 @@ async function run() {
         return;
       }
       const result = await userCollection.insertOne(updatedUser);
+      res.send(result);
+    });
+
+    //make admin finder
+    app.get("/users/search", async (req, res) => {
+      const email = req.query.email;
+      const query = {};
+      query.email = { $regex: email, $options: "i" };
+      const result = await userCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    //make admin
+    app.patch("/users/admin/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { role: "admin" } }
+      );
+      res.send(result);
+    });
+
+    //Remove admin
+    app.patch("/users/admin/:id/remove", async (req, res) => {
+      const id = req.params.id;
+      const result = await userCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { role: "user" } }
+      );
       res.send(result);
     });
 
@@ -123,7 +153,6 @@ async function run() {
       const result = await userCollection.deleteOne({ _id: new ObjectId(id) });
       res.send(result);
     });
-
     app.delete("/users/firebase/:email", async (req, res) => {
       const email = req.params.email;
       try {
@@ -135,6 +164,35 @@ async function run() {
         res.status(500).send({ error: "Failed to delete from Firebase" });
       }
     });
+
+    //make routine
+    app.post("/routines", async (req, res) => {
+      const routine = req.body;
+      const result = await routineCollection.insertOne(routine);
+      res.send(result);
+    });
+
+    //get routine by email
+    app.get("/routines/:email", async (req, res) => {
+      const email = req.params.email;
+      const routine = await routineCollection.findOne({ email });
+      res.send(routine);
+    });
+
+    //update routine collection
+    app.put("/routines/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedRoutine = req.body;
+
+      const result = await routineCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedRoutine }
+      );
+
+      res.send(result);
+    });
+
+    //add class
   } finally {
   }
 }
