@@ -34,7 +34,28 @@ async function run() {
     const userCollection = db.collection("users");
     const teacherCollection = db.collection("teachers");
     const routineCollection = db.collection("routines");
+    const classCollection = db.collection("classes");
 
+
+
+    //verify token
+     const verifyFirebaseToken = async (req, res, next) => {
+      const authHeader = req.headers.authorization;
+      if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        return res.status(401).send({ message: "Unauthorized access" });
+      }
+      const token = authHeader.split("Bearer ")[1];
+
+      try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        req.decoded = decoded;
+        next();
+      } catch (error) {
+        console.error("Firebase token verification error:", error);
+        res.status(401).send({ message: "Unauthorized access" });
+      }
+    };
+    
     // set user on database with role
     app.post("/users", async (req, res) => {
       const { email, name } = req.body;
@@ -193,6 +214,69 @@ async function run() {
     });
 
     //add class
+    app.post("/classes", async (req, res) => {
+      const classData = req.body;
+      const result = await classCollection.insertOne(classData);
+      res.send(result);
+    });
+
+    //get all classes
+    app.get("/classes", async (req, res) => {
+      const classes = await classCollection.find().toArray();
+      res.send(classes);
+    });
+    //get teachers classes
+    app.get("/my-classes", async (req, res) => {
+      const email = req.query.email;
+      try {
+        const classes = await classCollection
+          .find({ teacherEmail: email })
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.json(classes);
+      } catch (err) {
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    //edit class content
+    app.patch("/classes/:id", async (req, res) => {
+      const { id } = req.params;
+      const { className, youtubeLink, email } = req.body;
+      console.log(className, email,id);
+
+      try {
+        const result = await classCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+            teacherEmail: email,
+          },
+          {
+            $set: {
+              className,
+              youtubeLink,
+            },
+          }
+        );
+
+       res.send(result)
+      } catch (err) {
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
+    //delete classes
+    app.delete("/classes/:id", async (req, res) => {
+      const id = req.params.id
+
+      try {
+        const result = await classCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        res.send(result);
+      } catch (err) {
+        res.status(500).json({ message: "Server Error" });
+      }
+    });
   } finally {
   }
 }
