@@ -35,6 +35,7 @@ async function run() {
     const teacherCollection = db.collection("teachers");
     const routineCollection = db.collection("routines");
     const classCollection = db.collection("classes");
+    const liveClassCollection = db.collection("liveClasses");
 
     //verify token
     const verifyFirebaseToken = async (req, res, next) => {
@@ -357,6 +358,23 @@ async function run() {
         }
       }
     );
+
+    //live classes post
+    app.post("/live-classes", async (req, res) => {
+      const classData = req.body;
+      classData.createdAt = new Date();
+      const result = await liveClassCollection.insertOne(classData);
+      res.send(result);
+    });
+
+    //get live classes
+    app.get("/live-classes", async (req, res) => {
+      const result = await liveClassCollection
+        .find()
+        .sort({ dateTime: 1 })
+        .toArray();
+      res.send(result);
+    });
   } finally {
   }
 }
