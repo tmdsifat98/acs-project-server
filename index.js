@@ -255,8 +255,8 @@ async function run() {
     });
 
     //get routine by email
-    app.get("/routines/:email", async (req, res) => {
-      const email = req.params.email;
+    app.get("/routines", async (req, res) => {
+      const email = req.query.email;
       const routine = await routineCollection.findOne({ email });
       res.send(routine);
     });
@@ -264,13 +264,13 @@ async function run() {
     //update routine collection
     app.put("/routines/:id", async (req, res) => {
       const id = req.params.id;
-      const updatedRoutine = req.body;
+      const updatedRoutine = { ...req.body };
+      delete updatedRoutine._id;
 
       const result = await routineCollection.updateOne(
         { _id: new ObjectId(id) },
         { $set: updatedRoutine }
       );
-
       res.send(result);
     });
 
@@ -322,7 +322,6 @@ async function run() {
       async (req, res) => {
         const { id } = req.params;
         const { className, youtubeLink, email } = req.body;
-        console.log(className, email, id);
 
         try {
           const result = await classCollection.updateOne(
@@ -334,6 +333,7 @@ async function run() {
               $set: {
                 className,
                 youtubeLink,
+                createdAt: new Date().toISOString(),
               },
             }
           );
