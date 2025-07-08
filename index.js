@@ -12,7 +12,10 @@ admin.initializeApp({
 });
 
 // middleware
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:5173", "https://acs-future-school1.web.app"],
+  credentials: true,
+}));
 app.use(express.json());
 
 const port = process.env.PORT || 3000;
@@ -292,6 +295,8 @@ async function run() {
       }
       res.send(result);
     });
+
+    //get featured classes
     app.get("/featured-classes", async (req, res) => {
       const result = await classCollection.find().limit(6).toArray();
       res.send(result);
@@ -415,7 +420,7 @@ async function run() {
 run().catch(console.dir);
 
 app.get("/", (req, res) => {
-  res.send("Profast community");
+  res.send("Coaching management community");
 });
 
 app.listen(port, () => {
