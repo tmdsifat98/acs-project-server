@@ -36,6 +36,7 @@ async function run() {
     const routineCollection = db.collection("routines");
     const classCollection = db.collection("classes");
     const liveClassCollection = db.collection("liveClasses");
+    const testPaperCollection = db.collection("testPapers");
 
     //verify token
     const verifyFirebaseToken = async (req, res, next) => {
@@ -291,6 +292,10 @@ async function run() {
       }
       res.send(result);
     });
+    app.get("/featured-classes", async (req, res) => {
+      const result = await classCollection.find().limit(6).toArray();
+      res.send(result);
+    });
     //get teachers classes
     app.get(
       "/my-classes",
@@ -374,6 +379,34 @@ async function run() {
         .sort({ dateTime: 1 })
         .toArray();
       res.send(result);
+    });
+
+    //post test paper
+    app.post(
+      "/api/testpapers",
+      verifyFirebaseToken,
+      verifyTeacher,
+      async (req, res) => {
+        try {
+          const data = req.body;
+          const result = await testPaperCollection.insertOne(data);
+          res.status(201).json(result);
+        } catch (error) {
+          res.status(400).json({ error: error.message });
+        }
+      }
+    );
+    //get test paper api
+    app.get("/api/testpapers", async (req, res) => {
+      try {
+        const papers = await testPaperCollection
+          .find()
+          .sort({ publishedYear: -1 })
+          .toArray();
+        res.json(papers);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
     });
   } finally {
   }
